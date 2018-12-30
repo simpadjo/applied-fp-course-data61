@@ -118,7 +118,7 @@ mkCommentText
   :: Text
   -> Either Error CommentText
 mkCommentText txt = if (Data.Text.length txt == 0)
-                then Left $ Error "comment is empty"
+                then Left $ Error "Empty Comment Text"
                 else Right $ CommentText txt
 
 getCommentText
