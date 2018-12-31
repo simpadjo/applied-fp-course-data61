@@ -27,7 +27,9 @@ data DBComment = DBComment
 -- decode a single row from the database into a single representation of our
 -- type. This technique of translating a result row to a type will differ
 -- between different packages/databases.
+
+--TODO: should refer to col names
 instance FromRow DBComment where
-  fromRow = error "FromRow DBComment instance not implemented"
+  fromRow = DBComment <$> field <*> field <*> field <*> field
 
 -- Now move to ``src/Level04/Types.hs``
