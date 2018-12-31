@@ -5,7 +5,7 @@ module Level04.Types
   ( Error (..)
   , RqType (..)
   , ContentType (..)
-  , Topic
+  , Topic (..)
   , CommentText
   , Comment (..)
   , mkTopic
@@ -32,7 +32,7 @@ import qualified Data.Time.Format           as TF
 import           Waargonaut.Encode          (Encoder)
 import qualified Waargonaut.Encode          as E
 
-import           Level04.DB.Types           (DBComment)
+import           Level04.DB.Types           (DBComment(..))
 
 -- | Notice how we've moved these types into their own modules. It's cheap and
 -- easy to add modules to carve out components in a Haskell application. So
@@ -41,7 +41,7 @@ import           Level04.DB.Types           (DBComment)
 -- just spin up another module.
 import           Level04.Types.CommentText  (CommentText, getCommentText,
                                              mkCommentText)
-import           Level04.Types.Topic        (Topic, getTopic, mkTopic)
+import           Level04.Types.Topic        (Topic(..), getTopic, mkTopic)
 
 import           Level04.Types.Error        (Error (EmptyCommentText, EmptyTopic, UnknownRoute))
 
@@ -65,9 +65,17 @@ data Comment = Comment
 --
 -- 'https://hackage.haskell.org/package/waargonaut/docs/Waargonaut-Encode.html'
 --
+
+--encodeCommentId :: Applicative f => Encoder f CommentId
+--encodeCommentId = (\cid -> case cid of (CommentId i) -> i) >$< E.int
+
+--TODO: i lost the battle with lenses, doing it the ugly way
 encodeComment :: Applicative f => Encoder f Comment
-encodeComment =
-  error "Comment JSON encoder not implemented"
+encodeComment = E.mapLikeObj $ \comment ->
+             E.intAt "id" (case commentId comment of (CommentId i) -> i)
+           . E.textAt "topic" (case commentTopic comment of Topic s -> s)
+           . E.textAt "body" (getCommentText $ commentBody comment)
+            . E.textAt "time" (encodeISO8601DateTime0 $ commentTime comment)
   -- Tip: Use the 'encodeISO8601DateTime' to handle the UTCTime for us.
 
 -- | For safety we take our stored `DBComment` and try to construct a `Comment`
@@ -77,8 +85,10 @@ encodeComment =
 fromDBComment
   :: DBComment
   -> Either Error Comment
-fromDBComment =
-  error "fromDBComment not yet implemented"
+fromDBComment (DBComment cid ctop ctext ctime) = do topic <- mkTopic ctop
+                                                    text <- mkCommentText ctext
+                                                    return $ Comment (CommentId cid) topic text ctime
+
 
 data RqType
   = AddRq Topic CommentText
@@ -97,6 +107,13 @@ renderContentType JSON      = "application/json"
 
 encodeISO8601DateTime :: Applicative f => Encoder f UTCTime
 encodeISO8601DateTime = pack . TF.formatTime loc fmt >$< E.text
+  where
+    fmt = TF.iso8601DateFormat (Just "%H:%M:%S")
+    loc = TF.defaultTimeLocale { TF.knownTimeZones = [] }
+
+--TODO: dirty workaround
+encodeISO8601DateTime0 :: UTCTime -> Text
+encodeISO8601DateTime0 t = pack $ TF.formatTime loc fmt t
   where
     fmt = TF.iso8601DateFormat (Just "%H:%M:%S")
     loc = TF.defaultTimeLocale { TF.knownTimeZones = [] }
