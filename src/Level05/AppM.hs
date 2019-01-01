@@ -2,9 +2,10 @@
 {-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Level05.AppM
-  ( AppM
+  ( AppM(..)
   , liftEither
   , runAppM
+  , catchError
   ) where
 
 import           Control.Monad.Except   (MonadError (..))
@@ -72,32 +73,54 @@ runAppM (AppM m) =
 
 instance Functor AppM where
   fmap :: (a -> b) -> AppM a -> AppM b
-  fmap = error "fmap for AppM not implemented"
+  fmap f (AppM x) = AppM r where
+                      r = do
+                           e <- x
+                           return $ f <$> e
 
 instance Applicative AppM where
   pure :: a -> AppM a
-  pure  = error "pure for AppM not implemented"
+  pure  x = AppM $ pure $ Right x
 
   (<*>) :: AppM (a -> b) -> AppM a -> AppM b
-  (<*>) = error "spaceship for AppM not implemented"
+  (<*>) (AppM iof) (AppM iox) =
+    AppM y where
+      y = do
+            ex <- iox
+            ef <- iof
+            return $ ef <*> ex
+
 
 instance Monad AppM where
   return :: a -> AppM a
   return = error "return for AppM not implemented"
 
   (>>=) :: AppM a -> (a -> AppM b) -> AppM b
-  (>>=)  = error "bind for AppM not implemented"
+  (>>=)  (AppM iox) f =
+    AppM y where
+      y = do
+            ex <- iox
+            case ex of
+              Left err -> return $ Left err
+              Right x -> runAppM $ f x
 
 instance MonadIO AppM where
   liftIO :: IO a -> AppM a
-  liftIO = error "liftIO for AppM not implemented"
+  liftIO ia = AppM y where
+               y = do x <- ia
+                      return $ Right x
 
 instance MonadError Error AppM where
   throwError :: Error -> AppM a
-  throwError = error "throwError for AppM not implemented"
+  throwError e = AppM $ pure $ Left e
 
   catchError :: AppM a -> (Error -> AppM a) -> AppM a
-  catchError = error "catchError for AppM not implemented"
+  catchError (AppM r) f = AppM y where
+                            y = do
+                              e <- r
+                              case e of
+                                Left err -> runAppM $ f err
+                                Right res -> return $ Right res
 
 -- This is a helper function that will `lift` an Either value into our new AppM
 -- by applying `throwError` to the Left value, and using `pure` to lift the
@@ -109,7 +132,7 @@ instance MonadError Error AppM where
 liftEither
   :: Either Error a
   -> AppM a
-liftEither =
-  error "liftEither not implemented"
+liftEither (Left err) = throwError err
+liftEither (Right res) = pure res
 
 -- Go to 'src/Level05/DB.hs' next.
