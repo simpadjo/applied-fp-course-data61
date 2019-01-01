@@ -2,10 +2,9 @@
 {-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Level06.AppM
-  ( AppM
+  ( AppM(..)
   , App
   , liftEither
-  , runAppM
   , runApp
   ) where
 
@@ -29,8 +28,9 @@ newtype AppM e a = AppM
 
 -- Predominantly our application has only one error type: 'Error'. It would be tedious to have to
 -- declare that on every signature. We're able to use a type _alias_ to avoid this problem. We can
--- define this type alias to make the error type variable concrete as 'Error'.
---
+-- define this type alias          --in cb response
+-- to make the error type variable concrete as 'Error'.
+
 type App = AppM Error
 
 -- We need to refactor the 'runAppM' function as now the name conflicts, and it needs to suit the
@@ -49,39 +49,61 @@ runApp = runAppM
 
 instance Functor (AppM e) where
   fmap :: (a -> b) -> AppM e a -> AppM e b
-  fmap = error "fmap for (AppM e) not implemented"
+  fmap f (AppM x) = AppM r where
+                      r = do
+                           ee <- x
+                           return $ f <$> ee
 
 instance Applicative (AppM e) where
   pure :: a -> AppM e a
-  pure  = error "pure for (AppM e) not implemented"
+  pure  x = AppM $ pure $ Right x
 
   (<*>) :: AppM e (a -> b) -> AppM e a -> AppM e b
-  (<*>) = error "spaceship for (AppM e) not implemented"
+  (<*>) (AppM iof) (AppM iox) =
+    AppM y where
+      y = do
+            ex <- iox
+            ef <- iof
+            return $ ef <*> ex
 
 instance Monad (AppM e) where
   return :: a -> AppM e a
-  return = error "return for (AppM e) not implemented"
+  return x = AppM $ pure $ Right x
 
   (>>=) :: AppM e a -> (a -> AppM e b) -> AppM e b
-  (>>=)  = error "bind for (AppM e) not implemented"
+  (>>=)  (AppM iox) f =
+    AppM y where
+      y = do
+            ex <- iox
+            case ex of
+              Left err -> return $ Left err
+              Right x -> runAppM $ f x
 
 instance MonadIO (AppM e) where
   liftIO :: IO a -> AppM e a
-  liftIO = error "liftIO for (AppM e) not implemented"
+  liftIO ia = AppM y where
+               y = do x <- ia
+                      return $ Right x
 
 instance MonadError e (AppM e) where
   throwError :: e -> AppM e a
-  throwError = error "throwError for (AppM e) not implemented"
+  throwError e = AppM $ pure $ Left e
 
   catchError :: AppM e a -> (e -> AppM e a) -> AppM e a
-  catchError = error "catchError for (AppM e) not implemented"
+  catchError (AppM r) f = AppM y where
+                            y = do
+                              e <- r
+                              case e of
+                                Left err -> runAppM $ f err
+                                Right res -> return $ Right res
 
 -- The 'Bifunctor' instance for 'Either' has proved useful several times
 -- already. Now that our 'AppM' exposes both type variables that are used in our
 -- 'Either', we can define a Bifunctor instance and reap similar benefits.
 instance Bifunctor AppM where
   bimap :: (e -> d) -> (a -> b) -> AppM e a -> AppM d b
-  bimap = error "bimap for AppM not implemented"
+  bimap f g (AppM x) = AppM y where
+                          y = bimap f g <$> x
 
 -- This is a helper function that will `lift` an Either value into our new AppM
 -- by applying `throwError` to the Left value, and using `pure` to lift the
@@ -91,4 +113,5 @@ instance Bifunctor AppM where
 -- pure :: Applicative m => a -> m a
 --
 liftEither :: Either e a -> AppM e a
-liftEither = error "throwLeft not implemented"
+liftEither (Left err) = throwError err
+liftEither (Right res) = pure res

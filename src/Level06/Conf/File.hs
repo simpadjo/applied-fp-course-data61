@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Level06.Conf.File where
 
-import           Data.ByteString            (ByteString)
+import           Data.ByteString            (ByteString, readFile)
 
 import           Data.Text                  (Text, pack)
 
@@ -16,9 +16,11 @@ import           Waargonaut                 (Json, parseWaargonaut)
 import qualified Waargonaut.Decode          as D
 import           Waargonaut.Decode.Error    (DecodeError (ParseFailed))
 
-import           Level06.AppM               (AppM)
-import           Level06.Types              (ConfigError (BadConfFile),
-                                             PartialConf (PartialConf))
+import           Level06.AppM               (AppM(..), liftEither)
+import           Level06.Types              (ConfigError (..),
+                                             PartialConf (PartialConf), partialConfDecoder)
+import           Control.Exception          (try)
+import Debug.Trace
 -- $setup
 -- >>> :set -XOverloadedStrings
 
@@ -35,16 +37,22 @@ import           Level06.Types              (ConfigError (BadConfFile),
 readConfFile
   :: FilePath
   -> AppM ConfigError ByteString
-readConfFile =
-  error "readConfFile not implemented"
+readConfFile path = AppM y where
+                      y = do
+                            e <- try (Data.ByteString.readFile path) :: IO (Either IOError ByteString)
+                            let e1 = first (const $ FileDoesntExist path) e
+                            return e1
+
 
 -- | Construct the function that will take a ``FilePath``, read it in, decode it,
 -- and construct our ``PartialConf``.
 parseJSONConfigFile
   :: FilePath
   -> AppM ConfigError PartialConf
-parseJSONConfigFile =
-  error "parseJSONConfigFile not implemented"
+parseJSONConfigFile path =
+  do jsonStr <- readConfFile path
+     let x = D.simpleDecode partialConfDecoder parseFunc jsonStr
+     liftEither $ first (\(e , _ ) -> BadConfFile e) x
   where
     parseFunc :: ByteString -> Either DecodeError Json
     parseFunc = first (ParseFailed . pack . show) . AB.parseOnly parseWaargonaut

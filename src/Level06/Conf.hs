@@ -7,12 +7,13 @@ module Level06.Conf
 import           GHC.Word                 (Word16)
 
 import           Data.Bifunctor           (first)
-import           Data.Monoid              ((<>))
+import           Data.Monoid              ((<>), Last(..))
 
-import           Level06.AppM             (AppM)
-import           Level06.Types            (Conf, ConfigError,
-                                           DBFilePath (DBFilePath), PartialConf,
+import           Level06.AppM             (AppM(..))
+import           Level06.Types            (Conf(..), ConfigError(..),
+                                           DBFilePath (DBFilePath), PartialConf(..),
                                            Port (Port))
+import           Data.Either
 
 import           Level06.Conf.CommandLine (commandLineParser)
 import           Level06.Conf.File        (parseJSONConfigFile)
@@ -23,7 +24,7 @@ import           Level06.Conf.File        (parseJSONConfigFile)
 defaultConf
   :: PartialConf
 defaultConf =
-  error "defaultConf not implemented"
+  PartialConf ( Last $ Just $ Port 8085) (Last $ Just $ DBFilePath "app_db.db")
 
 -- | We need something that will take our PartialConf and see if can finally build
 -- a complete ``Conf`` record. Also we need to highlight any missing values by
@@ -31,8 +32,12 @@ defaultConf =
 makeConfig
   :: PartialConf
   -> Either ConfigError Conf
-makeConfig =
-  error "makeConfig not implemented"
+makeConfig (PartialConf (Last portOpt) (Last dbPathOpt)) =
+  case portOpt of
+    Nothing -> Left $ PropertyMissing "No port"
+    Just p -> case dbPathOpt of
+                   Nothing -> Left $ PropertyMissing "no db path"
+                   Just db -> Right $ Conf p db
 
 -- | This is the function we'll actually export for building our configuration.
 -- Since it wraps all our efforts to read information from the command line, and
@@ -47,9 +52,11 @@ makeConfig =
 parseOptions
   :: FilePath
   -> AppM ConfigError Conf
-parseOptions =
-  -- Parse the options from the config file: "files/appconfig.json"
-  -- Parse the options from the commandline using 'commandLineParser'
-  -- Combine these with the default configuration 'defaultConf'
-  -- Return the final configuration value
-  error "parseOptions not implemented"
+parseOptions confPath =
+  AppM y where
+    y =  do  cli <- commandLineParser
+             fromFileE <- runAppM $ parseJSONConfigFile confPath
+          --   _ <- (putStrLn $ show fromFileE)
+             let confs = rights [Right cli, fromFileE]
+             let c = foldl (<>) defaultConf confs
+             return $ makeConfig c

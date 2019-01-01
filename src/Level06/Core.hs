@@ -37,11 +37,12 @@ import qualified Waargonaut.Encode                  as E
 
 import           Level06.AppM                       (App, AppM (..),
                                                      liftEither, runApp)
-import qualified Level06.Conf                       as Conf
+import qualified Level06.Conf                       as Conf (parseOptions)
 import qualified Level06.DB                         as DB
-import           Level06.Types                      (Conf, ConfigError,
+import           Level06.Types                      (Conf(..), ConfigError,
                                                      ContentType (..),
                                                      Error (..),
+                                                     confPortToWai, getDBFilePath,
                                                      RqType (AddRq, ListRq, ViewRq),
                                                      encodeComment, encodeTopic,
                                                      mkCommentText, mkTopic,
@@ -56,7 +57,14 @@ data StartUpError
   deriving Show
 
 runApplication :: IO ()
-runApplication = error "copy your previous 'runApp' implementation and refactor as needed"
+runApplication = let appm = do
+                              (conf, db) <- prepareAppReqs
+                              liftIO $ Ex.finally (run (confPortToWai conf) (app conf db)) (DB.closeDB db)
+                  in
+                    do eith <- runAppM appm
+                       case eith of
+                         Left err -> (putStrLn $ show err) *> (fail "Conf error")
+                         Right _ -> return ()
 
 -- | We need to complete the following steps to prepare our app requirements:
 --
@@ -71,7 +79,11 @@ runApplication = error "copy your previous 'runApp' implementation and refactor 
 -- up!
 --
 prepareAppReqs :: AppM StartUpError (Conf, DB.FirstAppDB)
-prepareAppReqs = error "copy your prepareAppReqs from the previous level."
+prepareAppReqs =
+  do cfg <- first ConfErr $ Conf.parseOptions "/home/evgenii/mysources/applied-fp-course-data61/conf.json"
+     let db0 = DB.initDB (getDBFilePath $ dbPath cfg) :: IO (Either SQLiteResponse DB.FirstAppDB)
+     db <- AppM $ first DBInitErr <$> db0
+     return (cfg, db)
 
 -- | Some helper functions to make our lives a little more DRY.
 mkResponse
