@@ -3,6 +3,7 @@ module Level04.Types.Topic
   , mkTopic
   , getTopic
   , encodeTopic
+  , encodeTopics
   ) where
 
 import           Waargonaut.Encode          (Encoder)
@@ -61,3 +62,6 @@ getTopic (Topic t) =
 --
 encodeTopic :: Applicative f => Encoder f Topic
 encodeTopic = contramap getTopic E.text
+
+encodeTopics :: Applicative f => Encoder f [Topic]
+encodeTopics = E.list encodeTopic

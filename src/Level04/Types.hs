@@ -14,6 +14,7 @@ module Level04.Types
   , getCommentText
   , renderContentType
   , fromDBComment
+  , listCommentsEncoder
   ) where
 
 import           GHC.Generics               (Generic)
@@ -76,6 +77,10 @@ encodeComment = E.mapLikeObj $ \comment ->
            . E.textAt "topic" (case commentTopic comment of Topic s -> s)
            . E.textAt "body" (getCommentText $ commentBody comment)
             . E.textAt "time" (encodeISO8601DateTime0 $ commentTime comment)
+
+
+listCommentsEncoder ::  Applicative f => Encoder f [Comment]
+listCommentsEncoder = E.list encodeComment
   -- Tip: Use the 'encodeISO8601DateTime' to handle the UTCTime for us.
 
 -- | For safety we take our stored `DBComment` and try to construct a `Comment`

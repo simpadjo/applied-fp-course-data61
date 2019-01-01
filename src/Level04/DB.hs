@@ -15,14 +15,14 @@ import qualified Data.Text                          as Text
 
 import           Data.Time                          (getCurrentTime)
 
-import           Database.SQLite.Simple             (Connection, Query (Query))
+import           Database.SQLite.Simple             (Connection, Query (Query), fromOnly)
 import qualified Database.SQLite.Simple             as Sql
 
 import qualified Database.SQLite.SimpleErrors       as Sql
 import           Database.SQLite.SimpleErrors.Types (SQLiteResponse)
 
 import           Level04.Types                      (Comment, CommentText,
-                                                     Error(..), Topic, getTopic,
+                                                     Error(..), Topic, getTopic, mkTopic,
                                                      fromDBComment, getCommentText)
 
 import           Level04.DB.Types                   (DBComment)
@@ -112,15 +112,19 @@ getTopics (FirstAppDB conn) =
     do
       let q = Sql.query_ conn (Query sql) :: IO [Sql.Only Text]
       res <- Sql.runDBAction q
-      return $ error ""
+      let res1 = first (const DBError) res :: Either Error [Sql.Only Text]
+      return $ (\x -> traverse (mkTopic . fromOnly) x) =<< res1
 
 
 deleteTopic
   :: FirstAppDB
   -> Topic
   -> IO (Either Error ())
-deleteTopic =
+deleteTopic  (FirstAppDB conn) topic =
   let
     sql = "DELETE FROM comments WHERE topic = ?"
   in
-    error "deleteTopic not implemented"
+  do
+    let q = Sql.execute conn (Query sql) (Sql.Only $ getTopic topic)
+    res <- Sql.runDBAction q
+    return $ first (const DBError) res
