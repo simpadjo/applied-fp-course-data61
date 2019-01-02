@@ -8,6 +8,7 @@ module Level07.AppM
   , Env (..)
   , liftEither
   , runApp
+  , catchError
   ) where
 
 import           Control.Monad

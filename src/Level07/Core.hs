@@ -47,7 +47,7 @@ import           Level07.Types                      (Conf, ConfigError,
                                                      mkCommentText, mkTopic, FirstAppDB)
 
 import           Level07.AppM                       (App, AppM(..), Env (..), liftEither,
-                                                     runApp)
+                                                     runApp, catchError)
 
 -- | We're going to use the `mtl` ExceptT monad transformer to make the loading of
 -- our `Conf` a bit more straight-forward.
@@ -104,8 +104,17 @@ prepareAppReqs = let x = Conf.parseOptions "/home/evgenii/mysources/applied-fp-c
 app
   :: Env
   -> Application
-app =
-  error "Copy your completed 'app' from the previous level and refactor it here"
+app env req cb =
+  let rawResp = do rqType <- mkRequest req
+                   handleRequest rqType
+  in
+  let handled = catchError rawResp (\err -> pure $ mkErrorResponse err) in
+  let sent = fmap cb handled
+  in
+    do eith <-runAppM sent env
+       case eith of
+         Left err -> fail $ show err
+         Right r -> r
 
 handleRequest
   :: RqType
