@@ -93,7 +93,7 @@ instance Applicative AppM where
 
 instance Monad AppM where
   return :: a -> AppM a
-  return = error "return for AppM not implemented"
+  return x = pure  x
 
   (>>=) :: AppM a -> (a -> AppM b) -> AppM b
   (>>=)  (AppM iox) f =

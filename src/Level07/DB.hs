@@ -93,12 +93,16 @@ addCommentToTopic =
 getTopics
   :: App [Topic]
 getTopics =
-  error "Copy your completed 'getTopics' and refactor to match the new type signature"
+  let q = "SELECT DISTINCT topic FROM comments"
+  in
+    runDB (traverse ( mkTopic . Sql.fromOnly )) (\conn ->  Sql.query_ conn q)
 
 deleteTopic
   :: Topic
   -> App ()
-deleteTopic =
-  error "Copy your completed 'deleteTopic' and refactor to match the new type signature"
+deleteTopic topic =
+  let q = "DELETE FROM comments WHERE topic = ?"
+  in
+    runDB Right $ \conn ->  Sql.execute conn q (Sql.Only . getTopic $ topic)
 
 -- Go on to 'src/Level07/Core.hs' next.

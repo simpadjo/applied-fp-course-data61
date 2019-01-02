@@ -42,11 +42,11 @@ import qualified Level07.Responses                  as Res
 import           Level07.Types                      (Conf, ConfigError,
                                                      ContentType (PlainText),
                                                      Error (..), RqType (..),
-                                                     confPortToWai,
+                                                     confPortToWai, dbFilePath,
                                                      encodeComment, encodeTopic,
-                                                     mkCommentText, mkTopic)
+                                                     mkCommentText, mkTopic, FirstAppDB)
 
-import           Level07.AppM                       (App, Env (..), liftEither,
+import           Level07.AppM                       (App, AppM(..), Env (..), liftEither,
                                                      runApp)
 
 -- | We're going to use the `mtl` ExceptT monad transformer to make the loading of
@@ -83,7 +83,17 @@ runApplication = do
 -- 'mtl' on Hackage: https://hackage.haskell.org/package/mtl
 --
 prepareAppReqs :: ExceptT StartUpError IO Env
-prepareAppReqs = error "prepareAppReqs not reimplemented with ExceptT"
+prepareAppReqs = let x = Conf.parseOptions "/home/evgenii/mysources/applied-fp-course-data61/conf.json" :: IO (Either ConfigError Conf) in
+                 let confT = ExceptT $ do ec <- x
+                                          return $ first ConfErr ec
+                 in
+                 let logging = (\msg -> liftIO (putStrLn $ Text.unpack msg)) :: Text -> App ()
+                 in
+                 do  conf <- confT
+                     let db = DB.initDB $ dbFilePath conf  :: IO (Either SQLiteResponse FirstAppDB)
+                     let db0 = fmap (\eith -> first DBInitErr eith) db :: IO (Either StartUpError FirstAppDB)
+                     firstAppDb <- ExceptT db0
+                     return $ Env logging conf firstAppDb
   -- You may copy your previous implementation of this function and try refactoring it. On the
   -- condition you have to explain to the person next to you what you've done and why it works.
 
