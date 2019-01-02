@@ -10,7 +10,7 @@ module Level07.DB
   ) where
 
 import           Control.Monad.IO.Class             (liftIO)
-import           Control.Monad.Reader               (asks)
+import           Control.Monad.Reader               (asks, ask)
 
 import           Data.Bifunctor                     (first)
 import           Data.Text                          (Text)
@@ -25,7 +25,7 @@ import qualified Database.SQLite.Simple             as Sql
 import qualified Database.SQLite.SimpleErrors       as Sql
 import           Database.SQLite.SimpleErrors.Types (SQLiteResponse)
 
-import           Level07.AppM                      (App, Env (envDB))
+import           Level07.AppM                      (App, Env (envDB), AppM(..), liftEither)
 
 import           Level07.Types                     (Comment, CommentText,
                                                      DBFilePath (getDBFilePath),
@@ -34,6 +34,7 @@ import           Level07.Types                     (Comment, CommentText,
                                                      Topic, fromDBComment,
                                                      getCommentText, getTopic,
                                                      mkTopic)
+import            Level07.DB.Types                  (DBComment)
 
 -- Quick helper to pull the connection and close it down.
 closeDB
@@ -63,20 +64,24 @@ initDB fp = Sql.runDBAction $ do
 getDBConn
   :: App Connection
 getDBConn =
-  error "getDBConn not implemented"
+  let env = ask :: App Env in
+  fmap (dbConn . envDB ) env
 
 runDB
   :: (a -> Either Error b)
   -> (Connection -> IO a)
   -> App b
-runDB =
-  error "runDB not re-implemented"
+runDB fn cb = do conn <- getDBConn
+                 a0 <- liftIO $ cb conn
+                 liftEither $ fn a0
 
 getComments
   :: Topic
   -> App [Comment]
-getComments =
-  error "Copy your completed 'getComments' and refactor to match the new type signature"
+getComments topic =
+  let q = "SELECT id,topic,comment,time FROM comments WHERE topic = ?" in
+  let parse = \dbs -> traverse fromDBComment dbs in
+  runDB parse (\conn -> Sql.query conn q (Sql.Only . getTopic $ topic))
 
 addCommentToTopic
   :: Topic
